@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToDoリスト</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --text:#1f2430; --muted:#8a90a0;
+    --line:#e8eaf0; --accent:#5b6cff; --accent-soft:#eef0ff;
+    --done:#a8adbd; --carry:#ff8a3d; --carry-soft:#fff1e8; --green:#2fb56b;
+    --shadow:0 1px 3px rgba(20,24,40,.06),0 8px 24px rgba(20,24,40,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141c; --card:#1b1e29; --text:#e9ebf2; --muted:#8a90a5;
+      --line:#2a2e3d; --accent:#7b8bff; --accent-soft:#232744;
+      --done:#5a5f72; --carry:#ff9a55; --carry-soft:#33261c; --green:#3fce7c;
+      --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6;
+    padding:24px 16px 80px;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:620px;margin:0 auto}
+  header{margin-bottom:20px}
+  .date{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+  h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-top:2px}
+  .sub{font-size:13px;color:var(--muted);margin-top:4px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        box-shadow:var(--shadow);padding:6px;margin-bottom:18px}
+
+  .addbar{display:flex;gap:8px;padding:8px}
+  .addbar input{flex:1;border:none;background:transparent;color:var(--text);
+        font-size:16px;padding:10px 8px;outline:none}
+  .addbar input::placeholder{color:var(--muted)}
+  .addbtn{border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;
+        padding:0 18px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .addbtn:active{transform:scale(.96)}
+
+  .prog{display:flex;align-items:center;gap:10px;padding:4px 12px 10px}
+  .bar{flex:1;height:7px;background:var(--line);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:var(--green);
+        border-radius:99px;transition:width .3s ease}
+  .prog span{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
+
+  ul{list-style:none}
+  li.task{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+        border-top:1px solid var(--line)}
+  li.task:first-child{border-top:none}
+  .box{flex:none;width:22px;height:22px;border:2px solid var(--line);border-radius:7px;
+        margin-top:1px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .box:hover{border-color:var(--accent)}
+  .box.on{background:var(--green);border-color:var(--green)}
+  .box.on::after{content:"";width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;
+        transform:rotate(45deg);margin-top:-2px}
+  .txt{flex:1;font-size:16px;word-break:break-word}
+  .task.done .txt{color:var(--done);text-decoration:line-through}
+  .badge{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:99px;
+        background:var(--carry-soft);color:var(--carry);margin-right:6px;vertical-align:1.5px;letter-spacing:.03em}
+  .time{font-size:11px;color:var(--muted);font-weight:700;margin-top:2px}
+  .del{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
+        font-size:20px;line-height:1;padding:4px 8px;margin:-4px 0;opacity:0;transition:.15s}
+  li.task:hover .del{opacity:.6}
+  .del:hover{opacity:1!important;color:#e5484d}
+  /* タッチ端末（スマホ・タブレット）ではホバーが無いので常時表示 */
+  @media (hover:none){ .del{opacity:.45} }
+
+  .empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:14px}
+
+  /* 毎日のタスクを今日に入れるボタン */
+  .insert-daily{display:block;margin:2px 8px 8px;padding:11px;width:auto;
+        border:1.5px dashed var(--line);background:transparent;color:var(--accent);
+        font-size:14px;font-weight:800;border-radius:11px;cursor:pointer;transition:.15s}
+  .insert-daily:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .insert-daily:active{transform:scale(.99)}
+  .insert-daily[hidden]{display:none}
+
+  /* 毎日すること（テンプレート編集） */
+  .daily-body{padding:2px 6px 6px}
+  ul#dailyList{margin:0}
+  .ditem{display:flex;align-items:center;gap:10px;padding:9px 8px;border-top:1px solid var(--line)}
+  .ditem:first-child{border-top:none}
+  .ditem .dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--carry)}
+  .dtxt{flex:1;font-size:15px;outline:none;padding:3px 6px;border-radius:7px;transition:.12s}
+  .dtxt:focus{background:var(--accent-soft)}
+  .ditem:hover .del{opacity:.6}
+  .daily-empty{padding:12px 8px;color:var(--muted);font-size:13px;text-align:center}
+  .daily-add{padding:8px 4px 2px}
+
+  h2{font-size:14px;font-weight:800;color:var(--muted);margin:26px 4px 10px;letter-spacing:.04em}
+  details.day{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        margin-bottom:10px;overflow:hidden}
+  details.day > summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;
+        align-items:center;gap:10px;user-select:none}
+  details.day > summary::-webkit-details-marker{display:none}
+  .day-date{font-size:14px;font-weight:800}
+  .day-count{font-size:12px;color:var(--green);font-weight:800;background:var(--accent-soft);
+        padding:1px 9px;border-radius:99px;margin-left:auto}
+  .day-count.rec{background:transparent;color:var(--muted)}
+  details.day[open] > summary{border-bottom:1px solid var(--line)}
+  .rec{padding:6px 16px 12px}
+  .rec div{font-size:14px;color:var(--text);padding:6px 0;padding-left:22px;position:relative}
+  .rec div::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800}
+  .rec .t{color:var(--muted);font-size:11px;font-weight:700;margin-left:6px}
+
+  footer{text-align:center;color:var(--muted);font-size:11px;margin-top:30px;line-height:1.7}
+
+  /* スマホ向け微調整 */
+  @media (max-width:480px){
+    body{padding:16px 12px 60px}
+    h1{font-size:23px}
+    .sub{font-size:12px}
+    .txt{font-size:15.5px}
+    .addbar input{font-size:16px} /* iOSの自動ズーム防止に16px維持 */
+    .addbtn{padding:0 14px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="date" id="today"></div>
+    <h1>今日のToDo</h1>
+    <div class="sub">未完了は翌日へ自動で持ち越し／完了はその日の記録に残ります</div>
+  </header>
+
+  <div class="card">
+    <div class="addbar">
+      <input id="input" type="text" placeholder="やることを入力してEnter" autocomplete="off">
+      <button class="addbtn" id="add">追加</button>
+    </div>
+    <button class="insert-daily" id="insertDaily" hidden></button>
+    <div class="prog">
+      <div class="bar"><i id="fill"></i></div>
+      <span id="count">0 / 0</span>
+    </div>
+    <ul id="list"></ul>
+  </div>
+
+  <h2>毎日すること</h2>
+  <details class="day" id="dailyBox">
+    <summary>
+      <span class="day-date">🔁 毎日のテンプレート</span>
+      <span class="day-count rec" id="dailyCount">0件</span>
+    </summary>
+    <div class="daily-body">
+      <ul id="dailyList"></ul>
+      <div class="addbar daily-add">
+        <input id="dailyInput" type="text" placeholder="毎日やることを入力" autocomplete="off">
+        <button class="addbtn" id="dailyAdd">追加</button>
+      </div>
+    </div>
+  </details>
+
+  <h2>これまでの記録</h2>
+  <div id="history"></div>
+
+  <footer>
+    データはこのブラウザ内にのみ保存されます<br>
+    hitotsu company
+  </footer>
+</div>
+
+<script>
+const KEY = "todo_app_v1";
+const $ = s => document.querySelector(s);
+
+const todayStr = () => {
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+};
+const fmtDate = s => {
+  const [y,m,d] = s.split("-").map(Number);
+  const w = ["日","月","火","水","木","金","土"][new Date(y,m-1,d).getDay()];
+  return `${y}年${m}月${d}日（${w}）`;
+};
+const fmtDateShort = s => {
+  const [y,m,d] = s.split("-").map(Number);
+  const w = ["日","月","火","水","木","金","土"][new Date(y,m-1,d).getDay()];
+  return `${m}/${d}（${w}）`;
+};
+
+let tasks = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function save(){ localStorage.setItem(KEY, JSON.stringify(tasks)); }
+
+function addTask(text){
+  text = text.trim();
+  if(!text) return;
+  tasks.push({ id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
+               text, done:false, created:todayStr(), doneAt:null, doneDate:null });
+  save(); render();
+}
+function toggle(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  if(t.done){ t.done=false; t.doneAt=null; t.doneDate=null; }
+  else { t.done=true; t.doneAt=new Date().toISOString(); t.doneDate=todayStr(); }
+  save(); render();
+}
+function del(id){ tasks = tasks.filter(x=>x.id!==id); save(); render(); }
+
+function render(){
+  const today = todayStr();
+  $("#today").textContent = fmtDate(today);
+
+  // ---- 今日のリスト：未完了(全部) ＋ 今日完了した分 ----
+  const active = tasks.filter(t=>!t.done);
+  const doneToday = tasks.filter(t=>t.done && (t.doneDate||(t.doneAt||"").slice(0,10))===today);
+  const list = $("#list");
+  list.innerHTML = "";
+
+  if(active.length===0 && doneToday.length===0){
+    list.innerHTML = '<div class="empty">今日のやることはまだありません 🌱<br>上の欄から追加しましょう</div>';
+  }
+  active.forEach(t=>list.appendChild(row(t, today)));
+  doneToday.forEach(t=>list.appendChild(row(t, today)));
+
+  // 進捗（今日ぶん）
+  const totalToday = active.length + doneToday.length;
+  const pct = totalToday ? Math.round(doneToday.length/totalToday*100) : 0;
+  $("#fill").style.width = pct+"%";
+  $("#count").textContent = `${doneToday.length} / ${totalToday} 完了`;
+
+  renderHistory(today);
+}
+
+function row(t, today){
+  const li = document.createElement("li");
+  li.className = "task" + (t.done ? " done" : "");
+  const carried = !t.done && t.created !== today;
+
+  const box = document.createElement("div");
+  box.className = "box" + (t.done ? " on" : "");
+  box.onclick = ()=>toggle(t.id);
+
+  const wrap = document.createElement("div");
+  wrap.className = "txt";
+  const span = document.createElement("span");
+  if(carried) wrap.innerHTML = '<span class="badge">🔁 持ち越し</span>';
+  span.textContent = t.text;
+  wrap.appendChild(span);
+
+  const x = document.createElement("button");
+  x.className = "del"; x.textContent = "×"; x.title = "削除";
+  x.onclick = ()=>del(t.id);
+
+  li.append(box, wrap, x);
+  return li;
+}
+
+function renderHistory(today){
+  // 完了タスクを日付ごとに（今日を含む＝その日の記録）
+  const byDay = {};
+  tasks.filter(t=>t.done && t.doneAt).forEach(t=>{
+    const d = t.doneDate || t.doneAt.slice(0,10);
+    (byDay[d] ||= []).push(t);
+  });
+  const days = Object.keys(byDay).sort().reverse();
+  const box = $("#history");
+  box.innerHTML = "";
+  if(days.length===0){
+    box.innerHTML = '<div class="empty">完了したタスクがここに日ごとにたまります 📚</div>';
+    return;
+  }
+  days.forEach((d,i)=>{
+    const items = byDay[d].sort((a,b)=>a.doneAt.localeCompare(b.doneAt));
+    const det = document.createElement("details");
+    det.className = "day";
+    if(i===0) det.open = true;
+    const label = d===today ? "今日 " : "";
+    det.innerHTML =
+      `<summary><span class="day-date">${label}${fmtDateShort(d)}</span>`+
+      `<span class="day-count ${d===today?'':'rec'}">${items.length}件 完了</span></summary>`+
+      `<div class="rec">`+
+      items.map(t=>`<div>${esc(t.text)}</div>`).join("")+
+      `</div>`;
+    box.appendChild(det);
+  });
+}
+function esc(s){ return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+$("#add").onclick = ()=>{ addTask($("#input").value); $("#input").value=""; $("#input").focus(); };
+$("#input").addEventListener("keydown", e=>{ if(e.key==="Enter"){ addTask($("#input").value); $("#input").value=""; } });
+
+/* ===== 毎日すること（テンプレート） ===== */
+const DKEY = "todo_daily_v1";
+let dailies = loadDaily();
+function loadDaily(){ try{ return JSON.parse(localStorage.getItem(DKEY)) || []; }catch(e){ return []; } }
+function saveDaily(){ localStorage.setItem(DKEY, JSON.stringify(dailies)); }
+
+function addDaily(text){
+  text = text.trim();
+  if(!text) return;
+  dailies.push({ id:"d"+Date.now()+Math.random().toString(36).slice(2,5), text });
+  saveDaily(); renderDaily();
+}
+function editDaily(id, text){
+  const d = dailies.find(x=>x.id===id);
+  if(!d) return;
+  text = text.trim();
+  if(!text){ delDaily(id); return; }
+  d.text = text; saveDaily();
+}
+function delDaily(id){ dailies = dailies.filter(x=>x.id!==id); saveDaily(); renderDaily(); }
+
+// ボタン：毎日のタスクを今日のリストへ（同じ内容は重複させない）
+function insertDailies(){
+  const today = todayStr();
+  const present = new Set(
+    tasks.filter(t=>!t.done || (t.doneDate||(t.doneAt||"").slice(0,10))===today).map(t=>t.text)
+  );
+  let added = 0;
+  dailies.forEach(d=>{
+    if(!present.has(d.text)){
+      tasks.push({ id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
+                   text:d.text, done:false, created:today, doneAt:null, doneDate:null });
+      present.add(d.text); added++;
+    }
+  });
+  if(added){ save(); render(); }
+  const btn = $("#insertDaily");
+  const label = added ? `${added}件を追加しました` : "すべて追加済みです";
+  const orig = btn.textContent;
+  btn.textContent = "✓ " + label;
+  setTimeout(()=>renderDaily(), 1400);
+}
+
+function renderDaily(){
+  const list = $("#dailyList");
+  list.innerHTML = "";
+  if(dailies.length===0){
+    list.innerHTML = '<div class="daily-empty">下の欄から「毎日やること」を登録しましょう ☕</div>';
+  }
+  dailies.forEach(d=>{
+    const li = document.createElement("li");
+    li.className = "ditem";
+    const dot = document.createElement("span"); dot.className = "dot";
+    const tx = document.createElement("span");
+    tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
+    tx.addEventListener("blur", ()=>editDaily(d.id, tx.textContent));
+    tx.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); tx.blur(); } });
+    const x = document.createElement("button");
+    x.className = "del"; x.textContent = "×"; x.title = "削除";
+    x.onclick = ()=>delDaily(d.id);
+    li.append(dot, tx, x);
+    list.appendChild(li);
+  });
+  $("#dailyCount").textContent = dailies.length + "件";
+  const btn = $("#insertDaily");
+  if(dailies.length){
+    btn.hidden = false;
+    btn.textContent = `🔁 毎日のタスクを今日に追加（${dailies.length}件）`;
+  } else {
+    btn.hidden = true;
+  }
+}
+
+$("#dailyAdd").onclick = ()=>{ addDaily($("#dailyInput").value); $("#dailyInput").value=""; $("#dailyInput").focus(); };
+$("#dailyInput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ addDaily($("#dailyInput").value); $("#dailyInput").value=""; } });
+$("#insertDaily").onclick = insertDailies;
+
+render();
+renderDaily();
+</script>
+</body>
+</html>

@@ -62,7 +62,7 @@
   .txt{flex:1;font-size:16px;word-break:break-word}
   .task.done .txt{color:var(--done);text-decoration:line-through}
   .badge{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:99px;
-        background:var(--carry-soft);color:var(--carry);margin-right:6px;vertical-align:1.5px;letter-spacing:.03em}
+        background:var(--carry-soft);color:var(--carry);margin-left:6px;vertical-align:1.5px;letter-spacing:.03em}
   .del{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
         font-size:20px;line-height:1;padding:4px 8px;margin:-4px 0;opacity:0;transition:.15s}
   li.task:hover .del{opacity:.6}
@@ -321,9 +321,13 @@ function row(t, today){
   const wrap = document.createElement("div");
   wrap.className = "txt";
   const span = document.createElement("span");
-  if(carried) wrap.innerHTML = '<span class="badge">🔁 持ち越し</span>';
   span.textContent = t.text;
   wrap.appendChild(span);
+  if(carried){
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "持ち越し";
+    wrap.appendChild(b);
+  }
 
   const x = document.createElement("button");
   x.className = "del"; x.textContent = "×"; x.title = "削除";

@@ -89,6 +89,26 @@
   .dtxt:focus{background:var(--accent-soft)}
   .ditem:hover .del{opacity:.6}
   .daily-empty{padding:16px 8px;color:var(--muted);font-size:13px;text-align:center}
+  .move{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
+        font-size:13px;line-height:1;padding:5px 6px;border-radius:6px;transition:.12s}
+  .move:hover{color:var(--accent);background:var(--accent-soft)}
+  .move:disabled{opacity:.22;cursor:default}
+  .move:disabled:hover{background:transparent;color:var(--muted)}
+
+  /* 確認モーダル */
+  .modal{position:fixed;inset:0;z-index:50;background:rgba(20,24,40,.45);
+        display:flex;align-items:center;justify-content:center;padding:24px}
+  .modal[hidden]{display:none}
+  .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        box-shadow:var(--shadow);width:100%;max-width:320px;padding:20px}
+  .sheet-msg{font-size:15px;font-weight:700;text-align:center;margin-bottom:16px;
+        line-height:1.6;word-break:break-word}
+  .sheet-btns{display:flex;gap:8px}
+  .mbtn{flex:1;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;
+        cursor:pointer;transition:.12s}
+  .mbtn:active{transform:scale(.97)}
+  .mbtn.cancel{background:var(--accent-soft);color:var(--text)}
+  .mbtn.danger{background:#e5484d;color:#fff}
 
   /* 記録 */
   details.day{background:var(--card);border:1px solid var(--line);border-radius:14px;
@@ -184,6 +204,16 @@
   <button data-view="record"><span class="ic">📚</span>記録</button>
 </nav>
 
+<div class="modal" id="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-msg" id="modalMsg"></div>
+    <div class="sheet-btns">
+      <button class="mbtn cancel" id="modalCancel">キャンセル</button>
+      <button class="mbtn danger" id="modalOk">削除する</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const KEY = "todo_app_v1";
 const $ = s => document.querySelector(s);
@@ -221,7 +251,33 @@ function toggle(id){
   else { t.done=true; t.doneAt=new Date().toISOString(); t.doneDate=todayStr(); }
   save(); render();
 }
-function del(id){ tasks = tasks.filter(x=>x.id!==id); save(); render(); }
+async function del(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  if(!await askConfirm(`「${t.text}」を消しますか？`)) return;
+  tasks = tasks.filter(x=>x.id!==id); save(); render();
+}
+
+/* ===== 確認モーダル（native confirm の代わり） ===== */
+function askConfirm(msg){
+  return new Promise(res=>{
+    const modal=$("#modal"), ok=$("#modalOk"), cancel=$("#modalCancel");
+    $("#modalMsg").textContent = msg;
+    modal.hidden = false;
+    const close=v=>{
+      modal.hidden = true;
+      ok.removeEventListener("click",onOk);
+      cancel.removeEventListener("click",onCancel);
+      modal.removeEventListener("click",onBg);
+      res(v);
+    };
+    const onOk=()=>close(true), onCancel=()=>close(false);
+    const onBg=e=>{ if(e.target===modal) close(false); };
+    ok.addEventListener("click",onOk);
+    cancel.addEventListener("click",onCancel);
+    modal.addEventListener("click",onBg);
+  });
+}
 
 function render(){
   const today = todayStr();
@@ -322,10 +378,23 @@ function editDaily(id, text){
   const d = dailies.find(x=>x.id===id);
   if(!d) return;
   text = text.trim();
-  if(!text){ delDaily(id); return; }
+  if(!text){ removeDaily(id); return; }   // 空にしたら確認なしで削除
   d.text = text; saveDaily();
 }
-function delDaily(id){ dailies = dailies.filter(x=>x.id!==id); saveDaily(); renderDaily(); }
+function removeDaily(id){ dailies = dailies.filter(x=>x.id!==id); saveDaily(); renderDaily(); }
+async function delDaily(id){
+  const d = dailies.find(x=>x.id===id);
+  if(!d) return;
+  if(!await askConfirm(`毎日リストから「${d.text}」を消しますか？`)) return;
+  removeDaily(id);
+}
+function moveDaily(id, dir){
+  const i = dailies.findIndex(x=>x.id===id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=dailies.length) return;
+  [dailies[i], dailies[j]] = [dailies[j], dailies[i]];
+  saveDaily(); renderDaily();
+}
 
 // ボタン：毎日のタスクを今日のリストへ（同じ内容は重複させない）
 function insertDailies(){
@@ -353,7 +422,7 @@ function renderDaily(){
   if(dailies.length===0){
     list.innerHTML = '<div class="daily-empty">下の欄から「毎日やること」を登録しましょう ☕</div>';
   }
-  dailies.forEach(d=>{
+  dailies.forEach((d,i)=>{
     const li = document.createElement("li");
     li.className = "ditem";
     const dot = document.createElement("span"); dot.className = "dot";
@@ -361,10 +430,16 @@ function renderDaily(){
     tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
     tx.addEventListener("blur", ()=>editDaily(d.id, tx.textContent));
     tx.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); tx.blur(); } });
+    const up = document.createElement("button");
+    up.className = "move"; up.textContent = "▲"; up.title = "上へ";
+    up.disabled = (i===0); up.onclick = ()=>moveDaily(d.id, -1);
+    const down = document.createElement("button");
+    down.className = "move"; down.textContent = "▼"; down.title = "下へ";
+    down.disabled = (i===dailies.length-1); down.onclick = ()=>moveDaily(d.id, 1);
     const x = document.createElement("button");
     x.className = "del"; x.textContent = "×"; x.title = "削除";
     x.onclick = ()=>delDaily(d.id);
-    li.append(dot, tx, x);
+    li.append(dot, tx, up, down, x);
     list.appendChild(li);
   });
   const btn = $("#insertDaily");

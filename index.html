@@ -89,11 +89,16 @@
   .dtxt:focus{background:var(--accent-soft)}
   .ditem:hover .del{opacity:.6}
   .daily-empty{padding:16px 8px;color:var(--muted);font-size:13px;text-align:center}
-  .move{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
-        font-size:13px;line-height:1;padding:5px 6px;border-radius:6px;transition:.12s}
-  .move:hover{color:var(--accent);background:var(--accent-soft)}
-  .move:disabled{opacity:.22;cursor:default}
-  .move:disabled:hover{background:transparent;color:var(--muted)}
+  /* 並び替え（長押し＋スライド） */
+  .grip{flex:none;color:var(--muted);font-size:18px;line-height:1;padding:4px 6px;
+        cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;opacity:.5;transition:.12s}
+  .grip:hover{opacity:1;color:var(--accent)}
+  .grip:active{cursor:grabbing}
+  .ditem{transition:background .12s}
+  .ditem.grabbing{background:var(--accent-soft);border-radius:10px;box-shadow:var(--shadow);
+        position:relative;z-index:5}
+  #dailyList.dragging{touch-action:none}
+  #dailyList.dragging .dtxt{pointer-events:none}
 
   /* 確認モーダル */
   .modal{position:fixed;inset:0;z-index:50;background:rgba(20,24,40,.45);
@@ -388,12 +393,58 @@ async function delDaily(id){
   if(!await askConfirm(`毎日リストから「${d.text}」を消しますか？`)) return;
   removeDaily(id);
 }
-function moveDaily(id, dir){
-  const i = dailies.findIndex(x=>x.id===id);
-  const j = i + dir;
-  if(i<0 || j<0 || j>=dailies.length) return;
-  [dailies[i], dailies[j]] = [dailies[j], dailies[i]];
-  saveDaily(); renderDaily();
+/* 並び替え：グリップを押す or 行を長押し → スライドで上下移動 */
+let drag = null;
+function activateDrag(clientY){
+  if(!drag) return;
+  drag.active = true; drag.startY = clientY;
+  const ae = document.activeElement; if(ae && ae.blur) ae.blur();
+  try{ window.getSelection().removeAllRanges(); }catch(_){}
+  drag.li.classList.add("grabbing");
+  $("#dailyList").classList.add("dragging");
+  try{ drag.li.setPointerCapture(drag.pointerId); }catch(_){}
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+function endDrag(){
+  if(!drag) return;
+  clearTimeout(drag.longTimer);
+  if(drag.active){
+    drag.li.classList.remove("grabbing");
+    $("#dailyList").classList.remove("dragging");
+    const ids = [...$("#dailyList").querySelectorAll(".ditem")].map(li=>li.dataset.id);
+    dailies = ids.map(id=>dailies.find(d=>d.id===id)).filter(Boolean);
+    saveDaily(); renderDaily();
+  }
+  drag = null;
+}
+function initDailyDrag(){
+  const list = $("#dailyList");
+  list.addEventListener("pointerdown", e=>{
+    const li = e.target.closest(".ditem");
+    if(!li || e.target.closest(".del")) return;
+    const onGrip = !!e.target.closest(".grip");
+    drag = { li, pointerId:e.pointerId, active:false, startY:e.clientY, longTimer:null };
+    if(onGrip){ e.preventDefault(); activateDrag(e.clientY); }
+    else { drag.longTimer = setTimeout(()=>activateDrag(e.clientY), 350); }
+  });
+  window.addEventListener("pointermove", e=>{
+    if(!drag) return;
+    if(!drag.active){
+      if(Math.abs(e.clientY - drag.startY) > 10){ clearTimeout(drag.longTimer); drag = null; }
+      return;
+    }
+    e.preventDefault();
+    const li = drag.li;
+    const others = [...list.querySelectorAll(".ditem")].filter(el=>el!==li);
+    let placed = false;
+    for(const s of others){
+      const r = s.getBoundingClientRect();
+      if(e.clientY < r.top + r.height/2){ list.insertBefore(li, s); placed = true; break; }
+    }
+    if(!placed) list.appendChild(li);
+  }, { passive:false });
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
 }
 
 // ボタン：毎日のタスクを今日のリストへ（同じ内容は重複させない）
@@ -422,24 +473,20 @@ function renderDaily(){
   if(dailies.length===0){
     list.innerHTML = '<div class="daily-empty">下の欄から「毎日やること」を登録しましょう ☕</div>';
   }
-  dailies.forEach((d,i)=>{
+  dailies.forEach(d=>{
     const li = document.createElement("li");
-    li.className = "ditem";
+    li.className = "ditem"; li.dataset.id = d.id;
     const dot = document.createElement("span"); dot.className = "dot";
     const tx = document.createElement("span");
     tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
     tx.addEventListener("blur", ()=>editDaily(d.id, tx.textContent));
     tx.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); tx.blur(); } });
-    const up = document.createElement("button");
-    up.className = "move"; up.textContent = "▲"; up.title = "上へ";
-    up.disabled = (i===0); up.onclick = ()=>moveDaily(d.id, -1);
-    const down = document.createElement("button");
-    down.className = "move"; down.textContent = "▼"; down.title = "下へ";
-    down.disabled = (i===dailies.length-1); down.onclick = ()=>moveDaily(d.id, 1);
+    const grip = document.createElement("span");
+    grip.className = "grip"; grip.textContent = "≡"; grip.title = "長押し＆スライドで並び替え";
     const x = document.createElement("button");
     x.className = "del"; x.textContent = "×"; x.title = "削除";
     x.onclick = ()=>delDaily(d.id);
-    li.append(dot, tx, up, down, x);
+    li.append(dot, tx, grip, x);
     list.appendChild(li);
   });
   const btn = $("#insertDaily");
@@ -467,6 +514,7 @@ document.querySelectorAll(".tabbar button").forEach(b=>{ b.onclick = ()=>showVie
 
 render();
 renderDaily();
+initDailyDrag();
 showView(localStorage.getItem(TABKEY) || "today");
 </script>
 </body>

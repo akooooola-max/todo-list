@@ -127,6 +127,11 @@
   .rec{padding:6px 16px 12px}
   .rec div{font-size:14px;color:var(--text);padding:6px 0;padding-left:22px;position:relative}
   .rec div::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800}
+  .clear-record{display:block;margin:10px auto 0;border:none;background:transparent;
+        color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;
+        padding:8px 14px;border-radius:9px;transition:.12s}
+  .clear-record:hover{color:#e5484d;background:var(--carry-soft)}
+  .clear-record[hidden]{display:none}
 
   /* 下タブバー */
   .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -232,6 +237,7 @@
       <div class="sub">完了したタスクが日ごとに残ります</div>
     </header>
     <div id="history"></div>
+    <button class="clear-record" id="clearRecord" hidden>記録をすべて消す</button>
   </section>
 
 </div>
@@ -382,6 +388,7 @@ function renderHistory(today){
   const days = Object.keys(byDay).sort().reverse();
   const box = $("#history");
   box.innerHTML = "";
+  $("#clearRecord").hidden = (days.length===0);
   if(days.length===0){
     box.innerHTML = '<div class="empty">完了したタスクがここに日ごとにたまります 📚</div>';
     return;
@@ -405,6 +412,12 @@ function esc(s){ return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt
 
 $("#add").onclick = ()=>{ addTask($("#input").value); $("#input").value=""; $("#input").focus(); };
 $("#input").addEventListener("keydown", e=>{ if(e.key==="Enter"){ addTask($("#input").value); $("#input").value=""; } });
+
+$("#clearRecord").onclick = async ()=>{
+  if(!await askConfirm("これまでの完了記録をすべて消しますか？（元に戻せません）")) return;
+  tasks = tasks.filter(t=>!t.done);
+  save(); render();
+};
 
 /* ===== 毎日すること（テンプレート） ===== */
 const DKEY = "todo_daily_v1";

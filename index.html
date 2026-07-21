@@ -84,7 +84,6 @@
   ul#dailyList{margin:0}
   .ditem{display:flex;align-items:center;gap:10px;padding:12px 12px;border-top:1px solid var(--line)}
   .ditem:first-child{border-top:none}
-  .ditem .dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--carry)}
   .dtxt{flex:1;font-size:15px;outline:none;padding:3px 6px;border-radius:7px;transition:.12s}
   .dtxt:focus{background:var(--accent-soft)}
   .ditem:hover .del{opacity:.6}
@@ -530,7 +529,6 @@ function createNoteList(storeKey, listEl, inputEl, addBtn, emptyText){
     arr.forEach(d=>{
       const li = document.createElement("li");
       li.className = "ditem"; li.dataset.id = d.id;
-      const dot = document.createElement("span"); dot.className = "dot";
       const tx = document.createElement("span");
       tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
       tx.addEventListener("blur", ()=>editItem(d.id, tx.textContent));
@@ -540,7 +538,7 @@ function createNoteList(storeKey, listEl, inputEl, addBtn, emptyText){
       const x = document.createElement("button");
       x.className = "del"; x.textContent = "×"; x.title = "削除";
       x.onclick = ()=>delItem(d.id);
-      li.append(dot, tx, grip, x);
+      li.append(tx, grip, x);
       listEl.appendChild(li);
     });
   }
@@ -579,7 +577,6 @@ function renderDaily(){
   dailies.forEach(d=>{
     const li = document.createElement("li");
     li.className = "ditem"; li.dataset.id = d.id;
-    const dot = document.createElement("span"); dot.className = "dot";
     const tx = document.createElement("span");
     tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
     tx.addEventListener("blur", ()=>editDaily(d.id, tx.textContent));
@@ -589,7 +586,7 @@ function renderDaily(){
     const x = document.createElement("button");
     x.className = "del"; x.textContent = "×"; x.title = "削除";
     x.onclick = ()=>delDaily(d.id);
-    li.append(dot, tx, grip, x);
+    li.append(tx, grip, x);
     list.appendChild(li);
   });
   const btn = $("#insertDaily");

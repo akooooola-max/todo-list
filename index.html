@@ -97,8 +97,8 @@
   .ditem{transition:background .12s}
   .ditem.grabbing{background:var(--accent-soft);border-radius:10px;box-shadow:var(--shadow);
         position:relative;z-index:5}
-  #dailyList.dragging{touch-action:none}
-  #dailyList.dragging .dtxt{pointer-events:none}
+  .notelist.dragging{touch-action:none}
+  .notelist.dragging .dtxt{pointer-events:none}
 
   /* 確認モーダル */
   .modal{position:fixed;inset:0;z-index:50;background:rgba(20,24,40,.45);
@@ -134,9 +134,9 @@
         background:var(--card);border-top:1px solid var(--line);
         padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));
         box-shadow:0 -2px 14px rgba(20,24,40,.05)}
-  .tabbar button{flex:1;max-width:150px;border:none;background:transparent;cursor:pointer;
+  .tabbar button{flex:1;max-width:110px;border:none;background:transparent;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;gap:1px;
-        padding:6px 4px;border-radius:12px;color:var(--muted);
+        padding:6px 2px;border-radius:12px;color:var(--muted);
         font-size:11px;font-weight:800;transition:.12s}
   .tabbar button .ic{font-size:20px;line-height:1.1}
   .tabbar button:hover{color:var(--text)}
@@ -150,6 +150,9 @@
     .txt{font-size:15.5px}
     .addbar input{font-size:16px} /* iOSの自動ズーム防止に16px維持 */
     .addbtn{padding:0 14px}
+    .tabbar{gap:2px;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+    .tabbar button{font-size:10px;padding:6px 1px}
+    .tabbar button .ic{font-size:18px}
   }
 </style>
 </head>
@@ -184,10 +187,40 @@
       <div class="sub">ここに登録した項目を、今日ページのボタンでまとめて追加できます</div>
     </header>
     <div class="card">
-      <ul id="dailyList"></ul>
+      <ul id="dailyList" class="notelist"></ul>
       <div class="addbar">
         <input id="dailyInput" type="text" placeholder="毎日やることを入力してEnter" autocomplete="off">
         <button class="addbtn" id="dailyAdd">追加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== アイデア ===== -->
+  <section class="view" id="view-ideas" hidden>
+    <header>
+      <h1>アイデア</h1>
+      <div class="sub">思いついたことを気軽にメモ。長押しで並び替え、タップで編集できます</div>
+    </header>
+    <div class="card">
+      <ul id="ideaList" class="notelist"></ul>
+      <div class="addbar">
+        <input id="ideaInput" type="text" placeholder="アイデアを入力してEnter" autocomplete="off">
+        <button class="addbtn" id="ideaAdd">追加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== いつかやる ===== -->
+  <section class="view" id="view-someday" hidden>
+    <header>
+      <h1>いつかやる</h1>
+      <div class="sub">今すぐじゃないけど、いつかやりたいこと</div>
+    </header>
+    <div class="card">
+      <ul id="somedayList" class="notelist"></ul>
+      <div class="addbar">
+        <input id="somedayInput" type="text" placeholder="いつかやることを入力してEnter" autocomplete="off">
+        <button class="addbtn" id="somedayAdd">追加</button>
       </div>
     </div>
   </section>
@@ -206,6 +239,8 @@
 <nav class="tabbar">
   <button data-view="today"><span class="ic">📋</span>今日</button>
   <button data-view="daily"><span class="ic">🔁</span>毎日</button>
+  <button data-view="ideas"><span class="ic">💡</span>アイデア</button>
+  <button data-view="someday"><span class="ic">⏳</span>いつか</button>
   <button data-view="record"><span class="ic">📚</span>記録</button>
 </nav>
 
@@ -397,7 +432,7 @@ async function delDaily(id){
   if(!await askConfirm(`毎日リストから「${d.text}」を消しますか？`)) return;
   removeDaily(id);
 }
-/* 並び替え：グリップを押す or 行を長押し → スライドで上下移動 */
+/* 並び替え（汎用）：グリップを押す or 行を長押し → スライドで上下移動 */
 let drag = null;
 function activateDrag(clientY){
   if(!drag) return;
@@ -405,7 +440,7 @@ function activateDrag(clientY){
   const ae = document.activeElement; if(ae && ae.blur) ae.blur();
   try{ window.getSelection().removeAllRanges(); }catch(_){}
   drag.li.classList.add("grabbing");
-  $("#dailyList").classList.add("dragging");
+  drag.listEl.classList.add("dragging");
   try{ drag.li.setPointerCapture(drag.pointerId); }catch(_){}
   if(navigator.vibrate) navigator.vibrate(15);
 }
@@ -414,41 +449,92 @@ function endDrag(){
   clearTimeout(drag.longTimer);
   if(drag.active){
     drag.li.classList.remove("grabbing");
-    $("#dailyList").classList.remove("dragging");
-    const ids = [...$("#dailyList").querySelectorAll(".ditem")].map(li=>li.dataset.id);
-    dailies = ids.map(id=>dailies.find(d=>d.id===id)).filter(Boolean);
-    saveDaily(); renderDaily();
+    drag.listEl.classList.remove("dragging");
+    const ids = [...drag.listEl.querySelectorAll("li[data-id]")].map(li=>li.dataset.id);
+    drag.commit(ids);
   }
   drag = null;
 }
-function initDailyDrag(){
-  const list = $("#dailyList");
-  list.addEventListener("pointerdown", e=>{
-    const li = e.target.closest(".ditem");
+function attachListDrag(listEl, commit){
+  listEl.addEventListener("pointerdown", e=>{
+    const li = e.target.closest("li[data-id]");
     if(!li || e.target.closest(".del")) return;
     const onGrip = !!e.target.closest(".grip");
-    drag = { li, pointerId:e.pointerId, active:false, startY:e.clientY, longTimer:null };
+    drag = { li, listEl, commit, pointerId:e.pointerId, active:false, startY:e.clientY, longTimer:null };
     if(onGrip){ e.preventDefault(); activateDrag(e.clientY); }
     else { drag.longTimer = setTimeout(()=>activateDrag(e.clientY), 350); }
   });
-  window.addEventListener("pointermove", e=>{
-    if(!drag) return;
-    if(!drag.active){
-      if(Math.abs(e.clientY - drag.startY) > 10){ clearTimeout(drag.longTimer); drag = null; }
-      return;
-    }
-    e.preventDefault();
-    const li = drag.li;
-    const others = [...list.querySelectorAll(".ditem")].filter(el=>el!==li);
-    let placed = false;
-    for(const s of others){
-      const r = s.getBoundingClientRect();
-      if(e.clientY < r.top + r.height/2){ list.insertBefore(li, s); placed = true; break; }
-    }
-    if(!placed) list.appendChild(li);
-  }, { passive:false });
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("pointercancel", endDrag);
+}
+window.addEventListener("pointermove", e=>{
+  if(!drag) return;
+  if(!drag.active){
+    if(Math.abs(e.clientY - drag.startY) > 10){ clearTimeout(drag.longTimer); drag = null; }
+    return;
+  }
+  e.preventDefault();
+  const li = drag.li, listEl = drag.listEl;
+  const others = [...listEl.querySelectorAll("li[data-id]")].filter(el=>el!==li);
+  let placed = false;
+  for(const s of others){
+    const r = s.getBoundingClientRect();
+    if(e.clientY < r.top + r.height/2){ listEl.insertBefore(li, s); placed = true; break; }
+  }
+  if(!placed) listEl.appendChild(li);
+}, { passive:false });
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
+
+function commitDaily(ids){
+  dailies = ids.map(id=>dailies.find(d=>d.id===id)).filter(Boolean);
+  saveDaily(); renderDaily();
+}
+
+/* アイデア／いつかやる：シンプルな編集可能リスト（汎用） */
+function createNoteList(storeKey, listEl, inputEl, addBtn, emptyText){
+  let arr = loadArr();
+  function loadArr(){ try{ return JSON.parse(localStorage.getItem(storeKey)) || []; }catch(e){ return []; } }
+  function persist(){ localStorage.setItem(storeKey, JSON.stringify(arr)); }
+  function add(text){
+    text = text.trim(); if(!text) return;
+    arr.push({ id:"n"+Date.now()+Math.random().toString(36).slice(2,5), text });
+    persist(); render();
+  }
+  function editItem(id, text){
+    const it = arr.find(x=>x.id===id); if(!it) return;
+    text = text.trim();
+    if(!text){ remove(id); return; }
+    it.text = text; persist();
+  }
+  function remove(id){ arr = arr.filter(x=>x.id!==id); persist(); render(); }
+  async function delItem(id){
+    const it = arr.find(x=>x.id===id); if(!it) return;
+    if(!await askConfirm(`「${it.text}」を消しますか？`)) return;
+    remove(id);
+  }
+  function render(){
+    listEl.innerHTML = "";
+    if(arr.length===0){ listEl.innerHTML = `<div class="daily-empty">${emptyText}</div>`; }
+    arr.forEach(d=>{
+      const li = document.createElement("li");
+      li.className = "ditem"; li.dataset.id = d.id;
+      const dot = document.createElement("span"); dot.className = "dot";
+      const tx = document.createElement("span");
+      tx.className = "dtxt"; tx.contentEditable = "true"; tx.spellcheck = false; tx.textContent = d.text;
+      tx.addEventListener("blur", ()=>editItem(d.id, tx.textContent));
+      tx.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); tx.blur(); } });
+      const grip = document.createElement("span");
+      grip.className = "grip"; grip.textContent = "≡"; grip.title = "長押し＆スライドで並び替え";
+      const x = document.createElement("button");
+      x.className = "del"; x.textContent = "×"; x.title = "削除";
+      x.onclick = ()=>delItem(d.id);
+      li.append(dot, tx, grip, x);
+      listEl.appendChild(li);
+    });
+  }
+  addBtn.onclick = ()=>{ add(inputEl.value); inputEl.value=""; inputEl.focus(); };
+  inputEl.addEventListener("keydown", e=>{ if(e.key==="Enter"){ add(inputEl.value); inputEl.value=""; } });
+  attachListDrag(listEl, ids=>{ arr = ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); persist(); render(); });
+  render();
 }
 
 // ボタン：毎日のタスクを今日のリストへ（同じ内容は重複させない）
@@ -508,8 +594,10 @@ $("#insertDaily").onclick = insertDailies;
 
 /* ===== ページ切替（下タブ） ===== */
 const TABKEY = "todo_tab_v1";
+const VIEWS = ["today","daily","ideas","someday","record"];
 function showView(name){
-  ["today","daily","record"].forEach(n=>{ $("#view-"+n).hidden = (n!==name); });
+  if(!VIEWS.includes(name)) name = "today";
+  VIEWS.forEach(n=>{ $("#view-"+n).hidden = (n!==name); });
   document.querySelectorAll(".tabbar button").forEach(b=>b.classList.toggle("active", b.dataset.view===name));
   localStorage.setItem(TABKEY, name);
   window.scrollTo(0,0);
@@ -518,7 +606,9 @@ document.querySelectorAll(".tabbar button").forEach(b=>{ b.onclick = ()=>showVie
 
 render();
 renderDaily();
-initDailyDrag();
+attachListDrag($("#dailyList"), commitDaily);
+createNoteList("todo_ideas_v1", $("#ideaList"), $("#ideaInput"), $("#ideaAdd"), "思いついたアイデアをここに追加しましょう 💡");
+createNoteList("todo_someday_v1", $("#somedayList"), $("#somedayInput"), $("#somedayAdd"), "いつかやりたいことをここに追加しましょう ⏳");
 showView(localStorage.getItem(TABKEY) || "today");
 </script>
 </body>

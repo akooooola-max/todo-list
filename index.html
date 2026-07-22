@@ -108,6 +108,8 @@
   ul#dailyList{margin:0}
   .ditem{display:flex;align-items:center;gap:10px;padding:12px 12px;border-top:1px solid var(--line)}
   .ditem:first-child{border-top:none}
+  /* 入力欄が上にある場合は1件目との間に区切り線を入れる */
+  .addbar + .notelist .ditem:first-child{border-top:1px solid var(--line)}
   .dtxt{flex:1;font-size:15px;outline:none;padding:3px 6px;border-radius:7px;transition:.12s}
   .dtxt:focus{background:var(--accent-soft)}
   .ditem:hover .del{opacity:.6}
@@ -214,14 +216,14 @@
     <header>
       <div class="date"></div>
       <h1>毎日すること</h1>
-      <div class="sub">ここに登録した項目を、今日ページのボタンでまとめて追加できます</div>
+      <div class="sub">今日ページのボタンでまとめて追加できます</div>
     </header>
     <div class="card">
-      <ul id="dailyList" class="notelist"></ul>
       <div class="addbar">
         <input id="dailyInput" type="text" placeholder="毎日やることを入力してEnter" autocomplete="off">
         <button class="addbtn" id="dailyAdd">追加</button>
       </div>
+      <ul id="dailyList" class="notelist"></ul>
     </div>
   </section>
 
@@ -233,11 +235,11 @@
       <div class="sub">思いついたことを気軽にメモ</div>
     </header>
     <div class="card">
-      <ul id="ideaList" class="notelist"></ul>
       <div class="addbar">
         <input id="ideaInput" type="text" placeholder="アイデアを入力してEnter" autocomplete="off">
         <button class="addbtn" id="ideaAdd">追加</button>
       </div>
+      <ul id="ideaList" class="notelist"></ul>
     </div>
   </section>
 
@@ -249,11 +251,11 @@
       <div class="sub">今すぐじゃないけど、いつかやりたいこと</div>
     </header>
     <div class="card">
-      <ul id="somedayList" class="notelist"></ul>
       <div class="addbar">
         <input id="somedayInput" type="text" placeholder="いつかやることを入力してEnter" autocomplete="off">
         <button class="addbtn" id="somedayAdd">追加</button>
       </div>
+      <ul id="somedayList" class="notelist"></ul>
     </div>
   </section>
 

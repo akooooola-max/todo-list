@@ -64,13 +64,16 @@
   .task.done .txt{color:var(--done);text-decoration:line-through}
   .carry-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
         background:var(--carry);margin-left:8px;vertical-align:1px}
-  .del{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
-        font-size:20px;line-height:1;padding:4px 8px;margin:-4px 0;opacity:0;transition:.15s}
+  /* 今日のタスク：タップで編集 */
+  .ttxt{outline:none;border-radius:7px;padding:1px 5px;margin-left:-5px;transition:.12s}
+  .ttxt:focus{background:var(--accent-soft)}
+  .del{flex:none;align-self:center;border:none;background:transparent;color:var(--muted);cursor:pointer;
+        font-size:20px;line-height:1;padding:4px 8px;opacity:0;transition:.15s}
   li.task:hover .del{opacity:.6}
   .del:hover{opacity:1!important;color:#e5484d}
   /* 他のリストへ移動 */
-  .move-btn{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
-        font-size:17px;line-height:1;padding:4px 6px;margin:-4px 0;opacity:0;transition:.15s}
+  .move-btn{flex:none;align-self:center;border:none;background:transparent;color:var(--muted);cursor:pointer;
+        font-size:17px;line-height:1;padding:4px 6px;opacity:0;transition:.15s}
   li.task:hover .move-btn{opacity:.6}
   .move-btn:hover{opacity:1!important;color:var(--accent)}
   /* タッチ端末（スマホ・タブレット）ではホバーが無いので常時表示 */
@@ -399,7 +402,15 @@ function row(t, today){
   const wrap = document.createElement("div");
   wrap.className = "txt";
   const span = document.createElement("span");
+  span.className = "ttxt";
+  span.contentEditable = "true"; span.spellcheck = false;
   span.textContent = t.text;
+  span.addEventListener("blur", ()=>{
+    const v = span.textContent.trim();
+    if(!v){ span.textContent = t.text; return; }   // 空にしたら元に戻す
+    if(v !== t.text){ t.text = v; save(); renderHistory(todayStr()); }
+  });
+  span.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); span.blur(); } });
   wrap.appendChild(span);
   if(carried){
     const b = document.createElement("span");

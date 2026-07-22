@@ -51,8 +51,9 @@
   .prog span{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
 
   ul{list-style:none}
-  li.task{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+  li.task{display:flex;align-items:flex-start;gap:9px;padding:12px 12px;
         border-top:1px solid var(--line)}
+  li.task .grip{align-self:center;padding:4px 3px}
   li.task:first-child{border-top:none}
   .box{flex:none;width:22px;height:22px;border:2px solid var(--line);border-radius:7px;
         margin-top:1px;cursor:pointer;display:grid;place-items:center;transition:.15s}
@@ -73,7 +74,7 @@
   .del:hover{opacity:1!important;color:#e5484d}
   /* 他のリストへ移動 */
   .move-btn{flex:none;align-self:center;border:none;background:transparent;color:var(--muted);cursor:pointer;
-        font-size:17px;line-height:1;padding:4px 6px;opacity:0;transition:.15s}
+        font-size:17px;line-height:1;padding:4px 4px;opacity:0;transition:.15s}
   li.task:hover .move-btn{opacity:.6}
   .move-btn:hover{opacity:1!important;color:var(--accent)}
   /* タッチ端末（スマホ・タブレット）ではホバーが無いので常時表示 */
@@ -117,10 +118,11 @@
   .grip:hover{opacity:1;color:var(--accent)}
   .grip:active{cursor:grabbing}
   .ditem{transition:background .12s}
-  .ditem.grabbing{background:var(--accent-soft);border-radius:10px;box-shadow:var(--shadow);
+  .grabbing{background:var(--accent-soft);border-radius:10px;box-shadow:var(--shadow);
         position:relative;z-index:5}
   .notelist.dragging{touch-action:none}
-  .notelist.dragging .dtxt{pointer-events:none}
+  .notelist.dragging .dtxt,
+  .notelist.dragging .ttxt{pointer-events:none}
 
   /* 確認モーダル */
   .modal{position:fixed;inset:0;z-index:50;background:rgba(20,24,40,.45);
@@ -203,7 +205,7 @@
         <div class="bar"><i id="fill"></i></div>
         <span id="count">0 / 0</span>
       </div>
-      <ul id="list"></ul>
+      <ul id="list" class="notelist"></ul>
     </div>
   </section>
 
@@ -393,6 +395,7 @@ function render(){
 function row(t, today){
   const li = document.createElement("li");
   li.className = "task" + (t.done ? " done" : "");
+  li.dataset.id = t.id;
   const carried = !t.done && t.created !== today;
 
   const box = document.createElement("div");
@@ -426,7 +429,9 @@ function row(t, today){
     const mv = document.createElement("button");
     mv.className = "move-btn"; mv.textContent = "→"; mv.title = "他のリストへ移動";
     mv.onclick = ()=>moveTask(t.id);
-    li.append(box, wrap, mv, x);
+    const grip = document.createElement("span");
+    grip.className = "grip"; grip.textContent = "≡"; grip.title = "長押し＆スライドで並び替え";
+    li.append(box, wrap, mv, grip, x);
   } else {
     li.append(box, wrap, x);
   }
@@ -602,6 +607,12 @@ window.addEventListener("pointermove", e=>{
 window.addEventListener("pointerup", endDrag);
 window.addEventListener("pointercancel", endDrag);
 
+function commitTasks(ids){
+  const shown = ids.map(id=>tasks.find(t=>t.id===id)).filter(Boolean);
+  const rest = tasks.filter(t=>!ids.includes(t.id));   // 過去の完了分など画面外のものは末尾へ
+  tasks = [...shown, ...rest];
+  save(); render();
+}
 function commitDaily(ids){
   dailies = ids.map(id=>dailies.find(d=>d.id===id)).filter(Boolean);
   saveDaily(); renderDaily();
@@ -723,6 +734,7 @@ document.querySelectorAll(".tabbar button").forEach(b=>{ b.onclick = ()=>showVie
 
 render();
 renderDaily();
+attachListDrag($("#list"), commitTasks);
 attachListDrag($("#dailyList"), commitDaily);
 ideaList = createNoteList("todo_ideas_v1", $("#ideaList"), $("#ideaInput"), $("#ideaAdd"), "思いついたアイデアをここに追加しましょう 💡");
 somedayList = createNoteList("todo_someday_v1", $("#somedayList"), $("#somedayInput"), $("#somedayAdd"), "いつかやりたいことをここに追加しましょう ⏳");

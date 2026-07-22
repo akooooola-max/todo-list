@@ -67,8 +67,27 @@
         font-size:20px;line-height:1;padding:4px 8px;margin:-4px 0;opacity:0;transition:.15s}
   li.task:hover .del{opacity:.6}
   .del:hover{opacity:1!important;color:#e5484d}
+  /* 他のリストへ移動 */
+  .move-btn{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
+        font-size:17px;line-height:1;padding:4px 6px;margin:-4px 0;opacity:0;transition:.15s}
+  li.task:hover .move-btn{opacity:.6}
+  .move-btn:hover{opacity:1!important;color:var(--accent)}
   /* タッチ端末（スマホ・タブレット）ではホバーが無いので常時表示 */
-  @media (hover:none){ .del{opacity:.45} }
+  @media (hover:none){ .del{opacity:.45} .move-btn{opacity:.45} }
+
+  /* 移動先の選択 */
+  .move-btns{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .mvbtn{border:1px solid var(--line);background:transparent;color:var(--text);
+        border-radius:10px;padding:12px;font-size:14px;font-weight:800;
+        cursor:pointer;transition:.12s;text-align:center}
+  .mvbtn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  #moveCancel{width:100%}
+
+  /* トースト（移動しました） */
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:60;
+        background:var(--text);color:var(--bg);font-size:13px;font-weight:800;
+        padding:10px 18px;border-radius:99px;box-shadow:var(--shadow);pointer-events:none}
+  .toast[hidden]{display:none}
 
   .empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:14px}
 
@@ -249,6 +268,20 @@
   <button data-view="record"><span class="ic">📚</span>記録</button>
 </nav>
 
+<div class="toast" id="toast" hidden></div>
+
+<div class="modal" id="moveModal" hidden>
+  <div class="sheet">
+    <div class="sheet-msg" id="moveMsg"></div>
+    <div class="move-btns">
+      <button class="mvbtn" data-dest="daily">🔁 毎日</button>
+      <button class="mvbtn" data-dest="ideas">💡 アイデア</button>
+      <button class="mvbtn" data-dest="someday">⏳ いつか</button>
+    </div>
+    <button class="mbtn cancel" id="moveCancel">キャンセル</button>
+  </div>
+</div>
+
 <div class="modal" id="modal" hidden>
   <div class="sheet">
     <div class="sheet-msg" id="modalMsg"></div>
@@ -373,7 +406,14 @@ function row(t, today){
   x.className = "del"; x.textContent = "×"; x.title = "削除";
   x.onclick = ()=>del(t.id);
 
-  li.append(box, wrap, x);
+  if(!t.done){
+    const mv = document.createElement("button");
+    mv.className = "move-btn"; mv.textContent = "→"; mv.title = "他のリストへ移動";
+    mv.onclick = ()=>moveTask(t.id);
+    li.append(box, wrap, mv, x);
+  } else {
+    li.append(box, wrap, x);
+  }
   return li;
 }
 
@@ -411,6 +451,56 @@ function esc(s){ return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt
 
 $("#add").onclick = ()=>{ addTask($("#input").value); $("#input").value=""; $("#input").focus(); };
 $("#input").addEventListener("keydown", e=>{ if(e.key==="Enter"){ addTask($("#input").value); $("#input").value=""; } });
+
+/* ===== 今日のタスクを他のリストへ移動 ===== */
+let ideaList = null, somedayList = null;
+let toastTimer = null;
+function toast(msg){
+  const el = $("#toast");
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.hidden = true; }, 1600);
+}
+function askMove(text){
+  return new Promise(res=>{
+    const modal = $("#moveModal"), cancel = $("#moveCancel");
+    $("#moveMsg").textContent = `「${text}」をどこへ移動しますか？`;
+    modal.hidden = false;
+    const btns = [...modal.querySelectorAll(".mvbtn")];
+    const close = v=>{
+      modal.hidden = true;
+      btns.forEach(b=>b.removeEventListener("click", b._h));
+      cancel.removeEventListener("click", onCancel);
+      modal.removeEventListener("click", onBg);
+      res(v);
+    };
+    const onCancel = ()=>close(null);
+    const onBg = e=>{ if(e.target===modal) close(null); };
+    btns.forEach(b=>{ b._h = ()=>close(b.dataset.dest); b.addEventListener("click", b._h); });
+    cancel.addEventListener("click", onCancel);
+    modal.addEventListener("click", onBg);
+  });
+}
+async function moveTask(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  const dest = await askMove(t.text);
+  if(!dest) return;
+  let label = "";
+  if(dest==="daily"){
+    if(!dailies.some(d=>d.text===t.text)) addDaily(t.text);
+    label = "毎日";
+  } else if(dest==="ideas"){
+    if(ideaList && !ideaList.has(t.text)) ideaList.add(t.text);
+    label = "アイデア";
+  } else if(dest==="someday"){
+    if(somedayList && !somedayList.has(t.text)) somedayList.add(t.text);
+    label = "いつか";
+  }
+  tasks = tasks.filter(x=>x.id!==id);
+  save(); render();
+  toast(`${label}に移動しました`);
+}
 
 $("#clearRecord").onclick = async ()=>{
   if(!await askConfirm("これまでの完了記録をすべて消しますか？（元に戻せません）")) return;
@@ -546,6 +636,7 @@ function createNoteList(storeKey, listEl, inputEl, addBtn, emptyText){
   inputEl.addEventListener("keydown", e=>{ if(e.key==="Enter"){ add(inputEl.value); inputEl.value=""; } });
   attachListDrag(listEl, ids=>{ arr = ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); persist(); render(); });
   render();
+  return { add, has: text=>arr.some(x=>x.text===text) };
 }
 
 // ボタン：毎日のタスクを今日のリストへ（同じ内容は重複させない）
@@ -617,8 +708,8 @@ document.querySelectorAll(".tabbar button").forEach(b=>{ b.onclick = ()=>showVie
 render();
 renderDaily();
 attachListDrag($("#dailyList"), commitDaily);
-createNoteList("todo_ideas_v1", $("#ideaList"), $("#ideaInput"), $("#ideaAdd"), "思いついたアイデアをここに追加しましょう 💡");
-createNoteList("todo_someday_v1", $("#somedayList"), $("#somedayInput"), $("#somedayAdd"), "いつかやりたいことをここに追加しましょう ⏳");
+ideaList = createNoteList("todo_ideas_v1", $("#ideaList"), $("#ideaInput"), $("#ideaAdd"), "思いついたアイデアをここに追加しましょう 💡");
+somedayList = createNoteList("todo_someday_v1", $("#somedayList"), $("#somedayInput"), $("#somedayAdd"), "いつかやりたいことをここに追加しましょう ⏳");
 showView(localStorage.getItem(TABKEY) || "today");
 </script>
 </body>

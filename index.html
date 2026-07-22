@@ -23,12 +23,13 @@
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;
     background:var(--bg);color:var(--text);line-height:1.6;
-    padding:24px 16px 96px;-webkit-font-smoothing:antialiased;
+    padding:24px 16px 120px;-webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:620px;margin:0 auto}
   .view[hidden]{display:none}
   header{margin-bottom:18px}
-  .date{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+  /* 日付行：他ページでも同じ高さを確保してタイトル位置を揃える */
+  .date{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.02em;min-height:21px}
   h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-top:2px}
   .sub{font-size:13px;color:var(--muted);margin-top:4px}
 
@@ -155,7 +156,7 @@
   .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;
         display:flex;justify-content:center;gap:6px;
         background:var(--card);border-top:1px solid var(--line);
-        padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));
+        padding:6px 10px calc(22px + env(safe-area-inset-bottom,0px));
         box-shadow:0 -2px 14px rgba(20,24,40,.05)}
   .tabbar button{flex:1;max-width:110px;border:none;background:transparent;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;gap:1px;
@@ -167,13 +168,13 @@
 
   /* スマホ向け微調整 */
   @media (max-width:480px){
-    body{padding:16px 12px 90px}
+    body{padding:16px 12px 120px}
     h1{font-size:23px}
     .sub{font-size:12px}
     .txt{font-size:15.5px}
     .addbar input{font-size:16px} /* iOSの自動ズーム防止に16px維持 */
     .addbtn{padding:0 14px}
-    .tabbar{gap:2px;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+    .tabbar{gap:2px;padding:6px 4px calc(22px + env(safe-area-inset-bottom,0px))}
     .tabbar button{font-size:10px;padding:6px 1px}
     .tabbar button .ic{font-size:18px}
   }
@@ -206,6 +207,7 @@
   <!-- ===== 毎日 ===== -->
   <section class="view" id="view-daily" hidden>
     <header>
+      <div class="date"></div>
       <h1>毎日すること</h1>
       <div class="sub">ここに登録した項目を、今日ページのボタンでまとめて追加できます</div>
     </header>
@@ -221,8 +223,9 @@
   <!-- ===== アイデア ===== -->
   <section class="view" id="view-ideas" hidden>
     <header>
+      <div class="date"></div>
       <h1>アイデア</h1>
-      <div class="sub">思いついたことを気軽にメモ。長押しで並び替え、タップで編集できます</div>
+      <div class="sub">思いついたことを気軽にメモ</div>
     </header>
     <div class="card">
       <ul id="ideaList" class="notelist"></ul>
@@ -236,6 +239,7 @@
   <!-- ===== いつかやる ===== -->
   <section class="view" id="view-someday" hidden>
     <header>
+      <div class="date"></div>
       <h1>いつかやる</h1>
       <div class="sub">今すぐじゃないけど、いつかやりたいこと</div>
     </header>
@@ -251,6 +255,7 @@
   <!-- ===== 記録 ===== -->
   <section class="view" id="view-record" hidden>
     <header>
+      <div class="date"></div>
       <h1>これまでの記録</h1>
       <div class="sub">完了したタスクが日ごとに残ります</div>
     </header>

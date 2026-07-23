@@ -330,7 +330,7 @@ function save(){ localStorage.setItem(KEY, JSON.stringify(tasks)); }
 function addTask(text){
   text = text.trim();
   if(!text) return;
-  tasks.push({ id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
+  tasks.unshift({ id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
                text, done:false, created:todayStr(), doneAt:null, doneDate:null });
   save(); render();
 }
@@ -374,7 +374,9 @@ function render(){
   $("#today").textContent = fmtDate(today);
 
   // ---- 今日のリスト：未完了(全部) ＋ 今日完了した分 ----
-  const active = tasks.filter(t=>!t.done);
+  // 今日入力したものを上、持ち越しを下に（各グループ内の順番は維持）
+  const active = tasks.filter(t=>!t.done)
+    .sort((a,b)=> (a.created!==today?1:0) - (b.created!==today?1:0));
   const doneToday = tasks.filter(t=>t.done && (t.doneDate||(t.doneAt||"").slice(0,10))===today);
   const list = $("#list");
   list.innerHTML = "";
